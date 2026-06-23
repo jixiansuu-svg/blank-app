@@ -11,7 +11,7 @@ st.markdown("支持精准数值输入。自动分别计算 **前侧独立电机*
 st.sidebar.header("🚜 1. 基础物理与工况")
 # 使用 number_input 替代 slider，支持直接键盘输入精确数值
 weight = st.sidebar.number_input("整机重量 (kg)", min_value=100.0, max_value=5000.0, value=900.0, step=10.0)
-slope_deg = st.sidebar.number_input("最大爬坡角度 (°)", min_value=0.0, max_value=60.0, value=0, step=1.0)
+slope_deg = st.sidebar.number_input("最大爬坡角度 (°)", min_value=0.0, max_value=60.0, value=0.0, step=1.0)
 v_target_kmh = st.sidebar.number_input("目标最高车速 (km/h)", min_value=0.5, max_value=50.0, value=3.6, step=0.1)
 safety_factor = st.sidebar.number_input("整机动力安全系数", min_value=1.0, max_value=3.0, value=1.3, step=0.1)
 mu_roll = st.sidebar.number_input("烂泥地滚动阻力系数", min_value=0.05, max_value=0.80, value=0.30, step=0.01)
