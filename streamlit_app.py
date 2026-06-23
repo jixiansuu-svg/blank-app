@@ -54,11 +54,11 @@ st.markdown("""
             background-color: #f1f5f9;
             color: #334155;
             font-weight: 600;
-            padding: 5px 8px;
+            padding: 4px 6px; /* 极致内边距 */
             border-bottom: 1.5px solid #cbd5e1;
         }
         .styled-table td {
-            padding: 4px 8px;
+            padding: 4px 6px;
             border-bottom: 1px solid #e2e8f0;
             color: #475569;
         }
@@ -77,7 +77,7 @@ st.markdown("<h2 style='text-align: center; margin-top: -35px; margin-bottom: 8p
 # ================= 2. 左右大布局分配 (38% 配置区 : 62% 仿真图纸与结果) =================
 main_left, main_right = st.columns([38, 62])
 
-# ================= 3. 左侧：配置区 (2列对齐平铺，无折叠) =================
+# ================= 3. 左侧：配置区 =================
 with main_left:
     st.markdown("<h4 style='margin-top:0px; margin-bottom:4px; font-size:1.1rem; color:#334155;'>🛠️ 参数配置区</h4>", unsafe_allow_html=True)
     
@@ -175,11 +175,11 @@ p_motor_steer_single = (t_motor_steer_single * rpm_motor_steer) / 9550
 total_p_drive = ((p_motor_front * 2) + (p_motor_rear * 2)) * 1000
 total_p_steer = (p_motor_steer_single * 2) * 1000
 
-# ================= 5. 右侧：总览 + 示意图 (缩小 50%) + 细分区 (无遮挡) =================
+# ================= 5. 右侧：总览 + 示意图 (大幅度缩小) + 细分区 (完全浮出) =================
 with main_right:
     st.markdown("<h4 style='margin-top:0px; margin-bottom:4px; font-size:1.1rem; color:#334155;'>📊 仿真结果与动态图纸</h4>", unsafe_allow_html=True)
     
-    # 5.1 总览：精美 HTML 扁平数据卡片 (紧凑型)
+    # 5.1 总览
     st.markdown(f"""
         <div class="overview-container">
             <div class="overview-card" style="border-left: 3px solid #1f77b4;">
@@ -197,50 +197,52 @@ with main_right:
         </div>
     """, unsafe_allow_html=True)
 
-    # 5.2 示意图：紧凑缩小 50% 比例的绘图，不撑大页面高度
+    # 5.2 示意图：彻底缩小 50% 物理大小 (画布调为超扁平 3.0 × 0.8，DPI微调)
     plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
     plt.rcParams['axes.unicode_minus'] = False
     
-    # 将高宽比调整为 6.0 : 1.25 (极高档的超扁平视觉，确保垂直高度只占原来的一半)
-    fig, ax = plt.subplots(figsize=(6.0, 1.25)) 
+    # 画布极度压缩：3.0英寸长，0.85英寸高 (极速扁平，杜绝纵向占地)
+    fig, ax = plt.subplots(figsize=(3.0, 0.85), dpi=130) 
     
-    # 绘制带 15% 透明度填充的实体轮胎 (线宽降至 1.8)
-    rear_wheel = plt.Circle((0, r_rear), r_rear, facecolor='#e1f5fe', edgecolor='#1f77b4', lw=1.8)
-    front_wheel = plt.Circle((wheelbase, r_front), r_front, facecolor='#e8f5e9', edgecolor='#2ca02c', lw=1.8)
+    # 实体车轮：线宽降至 1.0 (极致精简)
+    rear_wheel = plt.Circle((0, r_rear), r_rear, facecolor='#e1f5fe', edgecolor='#1f77b4', lw=1.0)
+    front_wheel = plt.Circle((wheelbase, r_front), r_front, facecolor='#e8f5e9', edgecolor='#2ca02c', lw=1.0)
     ax.add_patch(rear_wheel)
     ax.add_patch(front_wheel)
     
-    # 绘制车轴中心孔
-    ax.add_patch(plt.Circle((0, r_rear), 0.02, color='#334155'))
-    ax.add_patch(plt.Circle((wheelbase, r_front), 0.02, color='#334155'))
+    # 微型轴心孔
+    ax.add_patch(plt.Circle((0, r_rear), 0.015, color='#334155'))
+    ax.add_patch(plt.Circle((wheelbase, r_front), 0.015, color='#334155'))
     
-    # 实体底盘车架 (线宽降至 3.8)
-    ax.plot([0, wheelbase], [r_rear, r_front], color='#64748b', lw=3.8, solid_capstyle='round')
+    # 精简底盘车架 (线宽降至 2.2)
+    ax.plot([0, wheelbase], [r_rear, r_front], color='#64748b', lw=2.2, solid_capstyle='round')
     
-    # 重心 (CG) 红色指示点 (缩小 ms=8)
-    ax.plot(cg_x, r_rear + cg_height, marker='o', color='#ef4444', ms=8)
-    ax.plot([cg_x, cg_x], [r_rear + cg_height, 0], color='#ef4444', ls=':', lw=1.0)
+    # 微型红重心 (ms 降至 5)
+    ax.plot(cg_x, r_rear + cg_height, marker='o', color='#ef4444', ms=5)
+    ax.plot([cg_x, cg_x], [r_rear + cg_height, 0], color='#ef4444', ls=':', lw=0.6)
     
-    # 坚实的地平线 (线宽降至 1.8)
-    ax.axhline(0, color='#334155', lw=1.8)
+    # 纤细地平线 (线宽降至 1.0)
+    ax.axhline(0, color='#334155', lw=1.0)
     
-    # 标注轴压文字 (文字及圆角底色卡片缩小，且位置紧贴轮胎上方，绝不与黑色地平线重叠)
-    ax.text(0, r_rear + 0.12, f"后轴: {int(dyn_load_rear)}N", color='#1f77b4', ha='center', fontsize=8, weight='bold',
-            bbox=dict(boxstyle="round,pad=0.22", fc="#f0f9ff", ec="#1f77b4", lw=0.8))
-    ax.text(wheelbase, r_front + 0.12, f"前轴: {int(dyn_load_front)}N", color='#2ca02c', ha='center', fontsize=8, weight='bold',
-            bbox=dict(boxstyle="round,pad=0.22", fc="#f0fdf4", ec="#2ca02c", lw=0.8))
+    # 精密微型标注卡片 (字号降至 5.8，内边距 pad 降至 0.18，绝不与地平线冲突)
+    ax.text(0, r_rear + 0.10, f"后轴: {int(dyn_load_rear)}N", color='#1f77b4', ha='center', fontsize=5.8, weight='bold',
+            bbox=dict(boxstyle="round,pad=0.18", fc="#f0f9ff", ec="#1f77b4", lw=0.5))
+    ax.text(wheelbase, r_front + 0.10, f"前轴: {int(dyn_load_front)}N", color='#2ca02c', ha='center', fontsize=5.8, weight='bold',
+            bbox=dict(boxstyle="round,pad=0.18", fc="#f0fdf4", ec="#2ca02c", lw=0.5))
     
     ax.set_aspect('equal')
     ax.set_xlim(-0.4, wheelbase + 0.4)
-    ax.set_ylim(-0.18, max(r_rear, r_front) + cg_height + 0.22)
+    ax.set_ylim(-0.15, max(r_rear, r_front) + cg_height + 0.18)
     ax.axis('off')
     plt.tight_layout()
     
-    # 强制以较窄的容器比例显示图纸，使其整体缩小 50%
-    st.pyplot(fig, use_container_width=True)
+    # 🌟 关键：使用 columns 将缩小后的图纸在中央限制宽度陈列，阻止横向和纵向的强制拉伸
+    _, plot_center_col, _ = st.columns([1.5, 7.0, 1.5])
+    with plot_center_col:
+        st.pyplot(fig, use_container_width=False) # 彻底关闭容器拉伸，保全 50% 缩小的黄金比例！
 
-    # 5.3 细分区：高档工业表格 (表格紧凑上浮，完全避开遮挡)
-    st.markdown("<h4 style='margin-top:0px; margin-bottom:1px; font-size:0.95rem; color:#334155;'>🔍 独立电机细分规格明细</h4>", unsafe_allow_html=True)
+    # 5.3 细分区：高档工业表格 (由于上图缩减了一半高度，表格现已完美浮出，完全不被遮挡)
+    st.markdown("<h4 style='margin-top:2px; margin-bottom:1px; font-size:0.95rem; color:#334155;'>🔍 独立电机细分规格明细</h4>", unsafe_allow_html=True)
     
     table_html = f"""
     <table class="styled-table">
@@ -280,5 +282,5 @@ with main_right:
     """
     st.markdown(table_html, unsafe_allow_html=True)
     
-    # 底部系统级参数（极致紧凑化）
-    st.markdown("<div style='margin-top: 5px; font-size:0.8rem; color:#475569;'>📦 <b>整车克服总推力需求</b>: <code style='font-size:0.8rem;'>"+str(int(f_total))+" N</code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚀 <b>底盘设定仿真速度</b>: <code style='font-size:0.8rem;'>"+f"{v_target_ms:.2f} m/s"+"</code></div>", unsafe_allow_html=True)
+    # 底部系统级参数 (最紧凑一格)
+    st.markdown("<div style='margin-top: 3px; font-size:0.78rem; color:#475569;'>📦 <b>整车克服总推力需求</b>: <code style='font-size:0.75rem;'>"+str(int(f_total))+" N</code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚀 <b>底盘设定仿真速度</b>: <code style='font-size:0.75rem;'>"+f"{v_target_ms:.2f} m/s"+"</code></div>", unsafe_allow_html=True)
