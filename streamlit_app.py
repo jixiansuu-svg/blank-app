@@ -11,8 +11,8 @@ st.markdown("支持精准数值输入。自动分别计算 **前侧独立电机*
 st.sidebar.header("🚜 1. 基础物理与工况")
 # 使用 number_input 替代 slider，支持直接键盘输入精确数值
 weight = st.sidebar.number_input("整机重量 (kg)", min_value=100.0, max_value=5000.0, value=900.0, step=10.0)
-slope_deg = st.sidebar.number_input("最大爬坡角度 (°)", min_value=0.0, max_value=60.0, value=15.0, step=1.0)
-v_target_kmh = st.sidebar.number_input("目标最高车速 (km/h)", min_value=0.5, max_value=50.0, value=6.0, step=0.5)
+slope_deg = st.sidebar.number_input("最大爬坡角度 (°)", min_value=0.0, max_value=60.0, value=0, step=1.0)
+v_target_kmh = st.sidebar.number_input("目标最高车速 (km/h)", min_value=0.5, max_value=50.0, value=3.6, step=0.1)
 safety_factor = st.sidebar.number_input("整机动力安全系数", min_value=1.0, max_value=3.0, value=1.3, step=0.1)
 mu_roll = st.sidebar.number_input("烂泥地滚动阻力系数", min_value=0.05, max_value=0.80, value=0.30, step=0.01)
 
@@ -21,19 +21,19 @@ wheelbase = st.sidebar.number_input("轴距 (前后轮中心距)", min_value=500
 cg_height = st.sidebar.number_input("重心高度", min_value=100, max_value=2000, value=600, step=10) / 1000.0
 cg_x = st.sidebar.number_input("重心距后轴距离", min_value=100, max_value=2000, value=610, step=10) / 1000.0
 d_front = st.sidebar.number_input("前轮直径", min_value=200, max_value=2000, value=650, step=10) / 1000.0
-d_rear = st.sidebar.number_input("后轮直径", min_value=200, max_value=2000, value=950, step=10) / 1000.0
+d_rear = st.sidebar.number_input("后轮直径", min_value=200, max_value=2000, value=650, step=10) / 1000.0
 
 st.sidebar.header("⚙️ 3. 传动与转向参数")
 st.sidebar.caption("提示：若采用轮毂电机直驱，行走减速比请设为 1")
-i_drive = st.sidebar.number_input("行走系统总减速比", min_value=1.0, max_value=200.0, value=50.0, step=1.0)
-eff_drive = st.sidebar.number_input("行走传动综合效率 (%)", min_value=10.0, max_value=100.0, value=85.0,
+i_drive = st.sidebar.number_input("行走系统总减速比", min_value=1.0, max_value=200.0, value=40.7, step=0.1)
+eff_drive = st.sidebar.number_input("行走传动综合效率 (%)", min_value=10.0, max_value=100.0, value=70.0,
                                     step=1.0) / 100.0
 
-i_steer = st.sidebar.number_input("转向机构总减速比", min_value=1.0, max_value=200.0, value=30.0, step=1.0)
+i_steer = st.sidebar.number_input("转向机构总减速比", min_value=1.0, max_value=200.0, value=125.0, step=1.0)
 eff_steer = st.sidebar.number_input("转向传动综合效率 (%)", min_value=10.0, max_value=100.0, value=80.0,
                                     step=1.0) / 100.0
 
-tire_width = st.sidebar.number_input("前轮轮胎宽度 (mm)", min_value=50, max_value=500, value=150, step=10) / 1000.0
+tire_width = st.sidebar.number_input("前轮轮胎宽度 (mm)", min_value=50, max_value=500, value=120, step=10) / 1000.0
 kingpin_offset = st.sidebar.number_input("主销偏置距 (mm)", min_value=0, max_value=200, value=30, step=5) / 1000.0
 
 # ================= 3. 核心物理计算 =================
