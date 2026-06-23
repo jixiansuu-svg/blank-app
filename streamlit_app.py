@@ -121,7 +121,7 @@ with col2:
 with col3:
     st.subheader("📐 底盘 2D 侧视简图 & 物理状态")
     # 设置支持中文显示
-    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
+    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
     plt.rcParams['axes.unicode_minus'] = False
 
     fig, ax = plt.subplots(figsize=(7, 4.5))
