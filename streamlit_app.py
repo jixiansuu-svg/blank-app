@@ -34,7 +34,192 @@ eff_steer = st.sidebar.number_input("转向传动综合效率 (%)", min_value=10
 tire_width = st.sidebar.number_input("前轮轮胎宽度 (mm)", min_value=50, max_value=500, value=150, step=10) / 1000.0
 kingpin_offset = st.sidebar.number_input("主销偏置距 (mm)", min_value=0, max_value=200, value=30, step=5) / 1000.0
 
-# ================= 3. 核心物理计算 (动态轴荷动力分配模型) =================
+# ================= 3. 核心物理计算 (动态轴荷动力分配模型) =================import streamlit as st
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ================= 1. 页面基本配置 =================
+st.set_page_config(page_title="电动农机底盘数字孪生系统", layout="wide")
+st.title("⚡ 4WD独立驱动 底盘物理分析与选型仿真系统 (一页式仪表盘)")
+st.markdown("已匹配您的实测数据。调整上方输入参数，下方结果和仿真图纸将实时无缝联动。")
+
+# ================= 2. 上部：参数与系数输入面板 (分3列平铺) =================
+st.subheader("🛠️ 底盘与系统输入参数 (精确可调)")
+in_col1, in_col2, in_col3 = st.columns(3)
+
+with in_col1:
+    st.markdown("##### 🚗 1. 基础物理与工况")
+    weight = st.number_input("整机重量 (kg)", min_value=100.0, max_value=5000.0, value=900.0, step=10.0)
+    slope_deg = st.number_input("最大爬坡角度 (°)", min_value=0.0, max_value=60.0, value=0.0, step=1.0)
+    v_target_ms = st.number_input("目标车速 (m/s)", min_value=0.1, max_value=15.0, value=0.95, step=0.05) # 直接使用 m/s
+    safety_factor = st.number_input("动力安全系数 (1.0用于对比实测)", min_value=1.0, max_value=3.0, value=1.0, step=0.1)
+
+with in_col2:
+    st.markdown("##### 📐 2. 底盘几何尺寸 (mm)")
+    wheelbase_mm = st.number_input("轴距 (前后轮中心距)", min_value=500, max_value=3000, value=1220, step=10)
+    cg_height_mm = st.number_input("重心高度", min_value=100, max_value=2000, value=400, step=10)
+    cg_x_mm = st.number_input("重心距后轴水平距离 (610即为50:50)", min_value=100, max_value=2000, value=610, step=10)
+    d_front_mm = st.number_input("前轮直径", min_value=200, max_value=2000, value=650, step=10)
+    d_rear_mm = st.number_input("后轮直径", min_value=200, max_value=2000, value=850, step=10)
+    tire_width_mm = st.number_input("前轮轮胎宽度", min_value=50, max_value=500, value=150, step=10)
+    kingpin_offset_mm = st.number_input("主销偏置距", min_value=0, max_value=200, value=30, step=5)
+
+with in_col3:
+    st.markdown("##### ⚙️ 3. 系统传动与计算系数")
+    i_drive = st.number_input("行走轮边减速比", min_value=1.0, max_value=300.0, value=40.7, step=0.1)
+    eff_drive = st.number_input("行走传动效率 (%)", min_value=10.0, max_value=100.0, value=85.0, step=1.0) / 100.0
+    mu_roll = st.number_input("泥地滚动阻力系数", min_value=0.05, max_value=0.80, value=0.44, step=0.01)
+    
+    st.markdown("---") # 转向参数细分
+    i_steer = st.number_input("转向机构总减速比", min_value=1.0, max_value=300.0, value=125.0, step=1.0)
+    eff_steer = st.number_input("转向传动效率 (%)", min_value=10.0, max_value=100.0, value=80.0, step=1.0) / 100.0
+    mu_steer = st.number_input("原地转向摩擦系数", min_value=0.1, max_value=1.5, value=0.70, step=0.05)
+    rpm_kingpin = st.number_input("设定转向主销转速 (RPM)", min_value=0.5, max_value=30.0, value=5.0, step=0.5)
+
+# 单位换算为标准 SI 单位
+wheelbase = wheelbase_mm / 1000.0
+cg_height = cg_height_mm / 1000.0
+cg_x = cg_x_mm / 1000.0
+d_front = d_front_mm / 1000.0
+d_rear = d_rear_mm / 1000.0
+tire_width = tire_width_mm / 1000.0
+kingpin_offset = kingpin_offset_mm / 1000.0
+
+# ================= 3. 后台物理与轴荷动力计算 =================
+g = 9.81
+weight_n = weight * g
+slope_rad = np.radians(slope_deg)
+r_front = d_front / 2.0
+r_rear = d_rear / 2.0
+
+# --- A. 动态轴荷转移 (考虑静态重心及平地行驶阻力力矩) ---
+load_front_static = (weight_n * np.cos(slope_rad) * cg_x - weight_n * np.sin(slope_rad) * cg_height) / wheelbase
+f_rolling_temp = weight_n * mu_roll * np.cos(slope_rad)
+f_grade_temp = weight_n * np.sin(slope_rad)
+f_total_temp = f_rolling_temp + f_grade_temp
+delta_load = f_total_temp * (cg_height / wheelbase)
+
+dyn_load_front = load_front_static - delta_load
+dyn_load_rear = (weight_n * np.cos(slope_rad) - load_front_static) + delta_load
+if dyn_load_front < 0: dyn_load_front = 0 
+
+# --- B. 独立行走系统计算 ---
+f_total = f_total_temp
+total_load_on_wheels = dyn_load_front + dyn_load_rear
+k_front = dyn_load_front / total_load_on_wheels if total_load_on_wheels > 0 else 0
+k_rear = dyn_load_rear / total_load_on_wheels if total_load_on_wheels > 0 else 0
+
+# 根据动态轴荷分配推力 (每轮分担相应比例的 1/2)
+f_per_front_wheel = (f_total * k_front) / 2.0
+f_per_rear_wheel = (f_total * k_rear) / 2.0
+
+# 1. 前轮单台电机参数
+t_wheel_front = f_per_front_wheel * r_front * safety_factor
+t_motor_front = t_wheel_front / (i_drive * eff_drive)
+rpm_wheel_front = (v_target_ms * 60) / (np.pi * d_front)
+rpm_motor_front = rpm_wheel_front * i_drive
+p_motor_front = (t_motor_front * rpm_motor_front) / 9550 # kW
+
+# 2. 后轮单台电机参数
+t_wheel_rear = f_per_rear_wheel * r_rear * safety_factor
+t_motor_rear = t_wheel_rear / (i_drive * eff_drive)
+rpm_wheel_rear = (v_target_ms * 60) / (np.pi * d_rear)
+rpm_motor_rear = rpm_wheel_rear * i_drive
+p_motor_rear = (t_motor_rear * rpm_motor_rear) / 9550 # kW
+
+# --- C. 双独立转向系统计算 ---
+f_z_single_front = dyn_load_front / 2.0
+if f_z_single_front > 0:
+    t_steer_kingpin_single = mu_steer * f_z_single_front * np.sqrt((tire_width**2 / 8) + kingpin_offset**2)
+else:
+    t_steer_kingpin_single = 0
+
+t_steer_design_single = t_steer_kingpin_single * safety_factor
+rpm_motor_steer = rpm_kingpin * i_steer
+t_motor_steer_single = t_steer_design_single / (i_steer * eff_steer)
+p_motor_steer_single = (t_motor_steer_single * rpm_motor_steer) / 9550 # kW
+
+# --- D. 总动力汇总 ---
+# 行走总功率 = (2台前轮 + 2台后轮) 
+total_p_drive_kw = (p_motor_front * 2) + (p_motor_rear * 2)
+# 转向总功率 = 2台独立转向电机之和
+total_p_steer_kw = p_motor_steer_single * 2
+
+# ================= 4. 下部：计算结果与图纸 (分3列平铺) =================
+st.markdown("---")
+st.subheader("📊 仿真计算与数字孪生分析结果")
+out_col1, out_col2, out_col3 = st.columns([1.1, 1.1, 1.8])
+
+with out_col1:
+    st.success("⚡ **行走系统总成 (Drive System)**")
+    # 突出显示总功率指标
+    st.markdown("### 行走电机总功率")
+    st.markdown(f"<h2 style='color:#2ca02c;'>{total_p_drive_kw*1000:.1f} W <span style='font-size:16px;color:gray;'>({total_p_drive_kw:.2f} kW)</span></h2>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    st.markdown("🔵 **单台前置电机参数 (M1 / M2)**")
+    st.metric("前电机理论输出功率", f"{p_motor_front*1000:.1f} W")
+    st.metric("前电机设计扭矩", f"{t_motor_front:.1f} N·m")
+    st.metric("前电机理论转速", f"{int(rpm_motor_front)} RPM")
+    
+    st.markdown("---")
+    st.markdown("🟢 **单台后置电机参数 (M3 / M4)**")
+    st.metric("后电机理论输出功率", f"{p_motor_rear*1000:.1f} W")
+    st.metric("后电机设计扭矩", f"{t_motor_rear:.1f} N·m")
+    st.metric("后电机理论转速", f"{int(rpm_motor_rear)} RPM")
+
+with out_col2:
+    st.info("🔄 **转向系统总成 (Steering System)**")
+    # 突出显示总功率指标
+    st.markdown("### 转向电机总功率")
+    st.markdown(f"<h2 style='color:#ff7f0e;'>{total_p_steer_kw*1000:.1f} W <span style='font-size:16px;color:gray;'>({total_p_steer_kw:.3f} kW)</span></h2>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    st.markdown("🟠 **单台前轮转向电机参数 (共2台)**")
+    st.caption("每台电机独立驱动单侧前轮：")
+    st.metric("单台转向电机功率", f"{p_motor_steer_single*1000:.1f} W")
+    st.metric("单台转向电机扭矩", f"{t_motor_steer_single:.2f} N·m")
+    st.metric("单台转向电机转速", f"{int(rpm_motor_steer)} RPM")
+    st.markdown("---")
+    st.metric("车辆总阻力需求 (F_total)", f"{int(f_total)} N")
+    st.metric("动态前/后轴分配比", f"{k_front*100:.1f}% : {k_rear*100:.1f}%")
+
+with out_col3:
+    st.subheader("📐 底盘 2D 侧视简图")
+    
+    # 解决 Streamlit Cloud 的中文乱码问题
+    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
+    plt.rcParams['axes.unicode_minus'] = False
+    
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    
+    # 画前后轮
+    ax.add_patch(plt.Circle((0, r_rear), r_rear, color='#1f77b4', fill=False, lw=3, label='后轮 (M3/M4)'))
+    ax.add_patch(plt.Circle((wheelbase, r_front), r_front, color='#2ca02c', fill=False, lw=3, label='前轮 (M1/M2)'))
+    ax.plot([0, wheelbase], [r_rear, r_front], color='gray', ls='--', lw=2, label='底盘底板线')
+    
+    # 画重心
+    ax.plot(cg_x, r_rear + cg_height, marker='o', color='red', ms=12, label='重心 (CG)')
+    ax.plot([cg_x, cg_x], [r_rear + cg_height, 0], color='red', ls=':', lw=1)
+    
+    # 模拟坡面基准线
+    ax.axhline(0, color='black', lw=2)
+    
+    # 注释轴荷
+    ax.text(wheelbase, -0.15, f"动态前轴压: {int(dyn_load_front)}N", color='green', ha='center', fontsize=10, weight='bold')
+    ax.text(0, -0.15, f"动态后轴压: {int(dyn_load_rear)}N", color='blue', ha='center', fontsize=10, weight='bold')
+    
+    ax.set_aspect('equal')
+    ax.set_xlim(-0.6, wheelbase + 0.8)
+    ax.set_ylim(-0.3, max(r_rear, r_front) + cg_height + 0.4)
+    ax.legend(loc='upper left', fontsize=9)
+    ax.axis('off')
+    st.pyplot(fig)
+
+    st.markdown("---")
+    st.markdown(f"**🔬 物理仿真对齐报告：**")
+    st.markdown(f"- 1. 在当前阻力系数 **{mu_roll}** 下，虽然静态重心是 50:50，但跑起来后动态分配比自动转变为 **前轮 {k_front*100:.1f}% : 后轮 {k_rear*100:.1f}%**。")
+    st.markdown(f"- 2. 计算出全车行走电机的输出总功率（净机械功率之和）为 **{total_p_drive_kw*1000*eff_drive:.1f} W**。")
 g = 9.81
 weight_n = weight * g
 slope_rad = np.radians(slope_deg)
