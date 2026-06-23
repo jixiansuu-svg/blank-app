@@ -10,7 +10,7 @@ st.markdown("已匹配实测参数：**行走比 40.7，转向比 125，前轮 6
 # ================= 2. 侧边栏：精准数值输入 (默认值已调整为您的实测数据) =================
 st.sidebar.header("🚜 1. 基础物理与工况")
 weight = st.sidebar.number_input("整机重量 (kg)", min_value=100.0, max_value=5000.0, value=900.0, step=10.0)
-slope_deg = st.sidebar.number_input("最大爬坡角度 (°)", min_value=0.0, max_value=60.0, value=15.0, step=1.0)
+slope_deg = st.sidebar.number_input("最大爬坡角度 (°)", min_value=0.0, max_value=60.0, value=0.0, step=1.0)
 v_target_kmh = st.sidebar.number_input("目标车速 (km/h)", min_value=0.5, max_value=50.0, value=3.42, step=0.01) # 3.42km/h ≈ 0.95 m/s
 safety_factor = st.sidebar.number_input("整机动力安全系数", min_value=1.0, max_value=3.0, value=1.3, step=0.1)
 mu_roll = st.sidebar.number_input("阻力系数 (泥地滚动)", min_value=0.05, max_value=0.80, value=0.30, step=0.01)
