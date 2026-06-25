@@ -2,285 +2,210 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ================= 1. 页面配置与超紧凑 UI 样式注入 =================
-st.set_page_config(page_title="电动农机底盘仿真仪表盘", layout="wide")
+# ================= 1. 页面配置与看板级 UI 样式注入 =================
+st.set_page_config(page_title="4WID 农机底盘校核看板", layout="wide")
 
-# 注入高档紧凑样式，彻底清除滚动条，隐藏 Streamlit 顶底白边
 st.markdown("""
     <style>
-        /* 隐藏 Streamlit 顶部 Header、底部 Footer 和菜单 */
+        /* 隐藏无用元素，极致压缩边距以实现单屏 */
         header {visibility: hidden; height: 0px !important;}
         footer {visibility: hidden;}
-        #MainMenu {visibility: hidden;}
+        .block-container {padding-top: 1.2rem !important; padding-bottom: 0.2rem !important; padding-left: 1.5rem; padding-right: 1.5rem;}
         
-        /* 紧凑页面整体边距 */
-        .block-container {padding-top: 1.5rem !important; padding-bottom: 0.5rem !important; padding-left: 1.5rem; padding-right: 1.5rem;}
-        
-        /* 配置区卡片容器 */
-        .config-card {
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 10px 12px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03);
-        }
-        
-        /* 总览数据卡片 */
-        .overview-container { display: flex; gap: 10px; margin-bottom: 5px; }
-        .overview-card {
-            flex: 1;
-            background-color: #f8fafc;
+        /* 看板卡片样式 */
+        .panel-card {
+            background-color: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            padding: 6px 10px;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            padding: 10px 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            margin-bottom: 8px;
         }
-        .overview-label { font-size: 0.78rem; color: #64748b; font-weight: 500; margin-bottom: 1px; }
-        .overview-val { font-size: 1.3rem; font-weight: 700; color: #0f172a; }
+        .section-title { font-size: 0.95rem; font-weight: 700; color: #1e293b; border-bottom: 2px solid #3b82f6; padding-bottom: 4px; margin-bottom: 8px; }
         
-        /* 高档数据表格样式 (超压缩) */
-        .styled-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 2px;
-            font-size: 0.8rem;
-            text-align: left;
-            border-radius: 6px;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.01);
-        }
-        .styled-table th {
-            background-color: #f1f5f9;
-            color: #334155;
-            font-weight: 600;
-            padding: 4px 6px; /* 极致内边距 */
-            border-bottom: 1.5px solid #cbd5e1;
-        }
-        .styled-table td {
-            padding: 4px 6px;
-            border-bottom: 1px solid #e2e8f0;
-            color: #475569;
-        }
-        .styled-table tr:last-child td { border-bottom: none; }
+        /* 状态指示牌 */
+        .status-badge-ok { background-color: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.8rem;}
+        .status-badge-err { background-color: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.8rem;}
         
-        /* 压缩输入框、选择框与标题间距，杜绝滚动 */
-        .stNumberInput {margin-bottom: -1.2rem !important; margin-top: -5px !important;} 
-        .stSelectbox {margin-bottom: -1.2rem !important; margin-top: -5px !important;}
-        label {font-size: 0.75rem !important; margin-bottom: 1px !important; color: #475569 !important;}
+        /* 高档数据表格 */
+        .styled-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; }
+        .styled-table th { background-color: #f8fafc; color: #475569; padding: 6px 8px; border-bottom: 1.5px solid #cbd5e1; }
+        .styled-table td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        
+        /* 紧凑输入框 */
+        .stNumberInput {margin-bottom: -1.0rem !important; margin-top: -6px !important;}
+        label {font-size: 0.75rem !important; color: #475569 !important;}
     </style>
 """, unsafe_allow_html=True)
 
-# 重新设计无遮挡标题
-st.markdown("<h2 style='text-align: center; margin-top: -35px; margin-bottom: 8px; font-size: 1.7rem; color: #0f172a;'>🚜 四轮分布式电驱底盘 仿真设计中控台</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; margin-top: -30px; margin-bottom: 10px; font-size: 1.6rem; color: #0f172a;'>🚜 4WID 高速插秧机底盘 设计与校核看板</h2>", unsafe_allow_html=True)
 
-# ================= 2. 左右大布局分配 (38% 配置区 : 62% 仿真图纸与结果) =================
-main_left, main_right = st.columns([38, 62])
+# ================= 2. 全局布局 (35% 参数区 : 65% 校核与视图区) =================
+col_params, col_analysis = st.columns([35, 65])
 
-# ================= 3. 左侧：配置区 =================
-with main_left:
-    st.markdown("<h4 style='margin-top:0px; margin-bottom:4px; font-size:1.1rem; color:#334155;'>🛠️ 参数配置区</h4>", unsafe_allow_html=True)
+# ================= 3. 左侧：手册级参数配置区 =================
+with col_params:
+    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🛠️ 物理与环境参数输入 (参照手册)</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="config-card">', unsafe_allow_html=True)
-    in_col1, in_col2 = st.columns(2)
-    
-    with in_col1:
-        st.markdown("<span style='font-size:0.85rem; font-weight:bold; color:#0f172a;'>🚗 1. 车辆与工况</span>", unsafe_allow_html=True)
-        weight = st.number_input("整机重量 (kg)", min_value=100.0, max_value=5000.0, value=900.0, step=10.0)
-        v_target_ms = st.number_input("车辆速度 (m/s)", min_value=0.1, max_value=15.0, value=0.95, step=0.05)
-        slope_deg = st.number_input("爬坡角度 (°)", min_value=0.0, max_value=60.0, value=0.0, step=1.0)
-        safety_factor = st.number_input("动力安全系数", min_value=1.0, max_value=3.0, value=1.0, step=0.1)
+    p1, p2 = st.columns(2)
+    with p1:
+        weight = st.number_input("整机总质量 G (kg)", value=900.0, step=10.0)
+        v_target_ms = st.number_input("设计作业速度 (m/s)", value=0.95, step=0.05)
+        cg_x = st.number_input("重心距后轴 Lg (mm)", value=427, step=10) / 1000.0
+        cg_height = st.number_input("重心高度 Hg (mm)", value=400, step=10) / 1000.0
+        fc_float = st.number_input("浮船滑行阻力 Fc (N)", value=600.0, step=50.0)
         
-        dist_mode = st.selectbox("轴荷分配模式", ["💡 物理动态计算", "✍️ 手动指定比"])
-        if dist_mode == "✍️ 手动指定比":
-            manual_k_rear_percent = st.number_input("后轴占比 (%)", min_value=0.0, max_value=100.0, value=64.5, step=0.5)
-            k_rear = manual_k_rear_percent / 100.0
-            k_front = 1.0 - k_rear
-        else:
-            k_rear, k_front = 0.5, 0.5 
-            
-        st.markdown("<div style='margin-top:12px;'><span style='font-size:0.85rem; font-weight:bold; color:#0f172a;'>📐 2. 几何尺寸 (mm)</span></div>", unsafe_allow_html=True)
-        wheelbase = st.number_input("轴距 (前后轴)", min_value=500, max_value=3000, value=1220, step=10) / 1000.0
-        cg_height = st.number_input("重心高度", min_value=100, max_value=2000, value=400, step=10) / 1000.0
-        cg_x = st.number_input("重心距后轴 (50:50为610)", min_value=100, max_value=2000, value=610, step=10) / 1000.0
+    with p2:
+        wheelbase = st.number_input("轴距 L (mm)", value=1220, step=10) / 1000.0
+        d_front = st.number_input("前轮直径 D2 (mm)", value=650, step=10) / 1000.0
+        d_rear = st.number_input("后轮直径 D1 (mm)", value=850, step=10) / 1000.0
+        i_drive = st.number_input("轮边减速比 i", value=40.7, step=0.1)
+        eff_drive = st.number_input("传动效率 η (%)", value=85.0, step=1.0) / 100.0
 
-    with in_col2:
-        st.markdown("<span style='font-size:0.85rem; font-weight:bold; color:#0f172a;'>⚙️ 3. 传动与效率</span>", unsafe_allow_html=True)
-        i_drive = st.number_input("行走轮边减速比", min_value=1.0, max_value=300.0, value=40.7, step=0.1)
-        eff_drive = st.number_input("行走传动效率 (%)", min_value=10.0, max_value=100.0, value=85.0, step=1.0) / 100.0
-        mu_roll = st.number_input("泥地滚动阻力系数", min_value=0.05, max_value=0.80, value=0.44, step=0.01)
-        
-        st.markdown("<div style='margin-top:12px;'><span style='font-size:0.85rem; font-weight:bold; color:#0f172a;'>🔄 4. 转向与系统</span></div>", unsafe_allow_html=True)
-        i_steer = st.number_input("转向机构总减速比", min_value=1.0, max_value=300.0, value=125.0, step=1.0)
-        eff_steer = st.number_input("转向传动效率 (%)", min_value=10.0, max_value=100.0, value=80.0, step=1.0) / 100.0
-        mu_steer = st.number_input("转向摩擦系数", min_value=0.1, max_value=1.5, value=0.70, step=0.05)
-        rpm_kingpin = st.number_input("转向主销转速 (RPM)", min_value=0.5, max_value=30.0, value=5.0, step=0.5)
-        
-        d_front = st.number_input("前轮直径 (mm)", min_value=200, max_value=2000, value=650, step=10) / 1000.0
-        d_rear = st.number_input("后轮直径 (mm)", min_value=200, max_value=2000, value=850, step=10) / 1000.0
-        tire_width = st.number_input("前轮轮胎宽度 (mm)", min_value=50, max_value=500, value=150, step=10) / 1000.0
-        kingpin_offset = st.number_input("主销偏置距 (mm)", min_value=0, max_value=200, value=30, step=5) / 1000.0
-
+    st.markdown("<div style='margin-top:15px; margin-bottom:5px; font-size:0.8rem; font-weight:bold; color:#475569;'>底盘地面力学系数 (参考手册P513)</div>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        f2 = st.number_input("前轮滚阻系数 fd2", value=0.28, step=0.01)
+        phi2 = st.number_input("前轮附着系数 φ2", value=0.65, step=0.01)
+    with c2:
+        f1 = st.number_input("后轮滚阻系数 fd1", value=0.35, step=0.01)
+        phi1 = st.number_input("后轮附着系数 φ1", value=0.80, step=0.01)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ================= 4. 后台物理与分配计算 =================
+# ================= 4. 后台核心算法 (依据《农业机械设计手册》) =================
 g = 9.81
-weight_n = weight * g
-slope_rad = np.radians(slope_deg)
-r_front, r_rear = d_front / 2.0, d_rear / 2.0
+G_N = weight * g
 
-# 阻力计算
-f_rolling = weight_n * mu_roll * np.cos(slope_rad)
-f_grade = weight_n * np.sin(slope_rad)
-f_total = f_rolling + f_grade
+# 4.1 静态与动态轴荷计算 (考虑浮船阻力与滚阻造成的重心转移)
+Q_front_static = G_N * cg_x / wheelbase
+Q_rear_static = G_N - Q_front_static
 
-if dist_mode == "💡 物理动态计算":
-    load_front_static = (weight_n * np.cos(slope_rad) * cg_x - weight_n * np.sin(slope_rad) * cg_height) / wheelbase
-    delta_load = f_total * (cg_height / wheelbase)
-    dyn_load_front = max(0.0, load_front_static - delta_load)
-    dyn_load_rear = weight_n * np.cos(slope_rad) - dyn_load_front
+# 初始估算总推力用于计算重心转移
+F_total_est = (Q_front_static * f2) + (Q_rear_static * f1) + fc_float
+delta_Q = F_total_est * (cg_height / wheelbase)
+
+Qd2 = max(0.0, Q_front_static - delta_Q) # 前轴动态载荷
+Qd1 = G_N - Qd2                          # 后轴动态载荷
+
+# 4.2 真实阻力计算 (Fd = Q * f)
+Fd2 = Qd2 * f2
+Fd1 = Qd1 * f1
+Pd_total = Fd2 + Fd1 + fc_float # 总需求推力
+
+# 4.3 附着力极限校核 (最大不打滑牵引力)
+P_max2 = Qd2 * phi2  # 前轴最大牵引力
+P_max1 = Qd1 * phi1  # 后轴最大牵引力
+
+# 4.4 最优扭矩分配算法 (手册推导：Pd1/Pd2 ≈ Qd1*φ1 / Qd2*φ2)
+ratio_rear = (Qd1 * phi1) / ((Qd1 * phi1) + (Qd2 * phi2))
+ratio_front = 1.0 - ratio_rear
+
+Pd1_req = Pd_total * ratio_rear  # 后轴分配的目标推力
+Pd2_req = Pd_total * ratio_front # 前轴分配的目标推力
+
+# 4.5 电机参数计算 (单轮)
+r1, r2 = d_rear / 2.0, d_front / 2.0
+T_motor_rear = (Pd1_req / 2.0) * r1 / (i_drive * eff_drive)
+T_motor_front = (Pd2_req / 2.0) * r2 / (i_drive * eff_drive)
+
+rpm_motor_rear = (v_target_ms * 60 / (np.pi * d_rear)) * i_drive
+rpm_motor_front = (v_target_ms * 60 / (np.pi * d_front)) * i_drive
+
+P_kw_rear = (T_motor_rear * rpm_motor_rear) / 9550
+P_kw_front = (T_motor_front * rpm_motor_front) / 9550
+
+# 状态判定
+slip_front_status = "打滑警告!" if Pd2_req > P_max2 else "附着正常"
+slip_rear_status = "打滑警告!" if Pd1_req > P_max1 else "附着正常"
+badge_f = "status-badge-err" if Pd2_req > P_max2 else "status-badge-ok"
+badge_r = "status-badge-err" if Pd1_req > P_max1 else "status-badge-ok"
+
+# ================= 5. 右侧：设计校核与视图区 =================
+with col_analysis:
+    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">📈 动力学状态图纸与轴荷监控</div>', unsafe_allow_html=True)
     
-    total_load = dyn_load_front + dyn_load_rear
-    k_front = dyn_load_front / total_load if total_load > 0 else 0
-    k_rear = dyn_load_rear / total_load if total_load > 0 else 0
-else:
-    dyn_load_rear = weight_n * np.cos(slope_rad) * k_rear
-    dyn_load_front = weight_n * np.cos(slope_rad) * k_front
-
-f_per_front_wheel = (f_total * k_front) / 2.0
-f_per_rear_wheel = (f_total * k_rear) / 2.0
-
-# 前后驱动电机参数
-t_wheel_front = f_per_front_wheel * r_front * safety_factor
-t_motor_front = t_wheel_front / (i_drive * eff_drive)
-rpm_wheel_front = (v_target_ms * 60) / (np.pi * d_front)
-rpm_motor_front = rpm_wheel_front * i_drive
-p_motor_front = (t_motor_front * rpm_motor_front) / 9550
-
-t_wheel_rear = f_per_rear_wheel * r_rear * safety_factor
-t_motor_rear = t_wheel_rear / (i_drive * eff_drive)
-rpm_wheel_rear = (v_target_ms * 60) / (np.pi * d_rear)
-rpm_motor_rear = rpm_wheel_rear * i_drive
-p_motor_rear = (t_motor_rear * rpm_motor_rear) / 9550
-
-# 转向单电机 (共两台)
-f_z_single_front = dyn_load_front / 2.0
-t_steer_kingpin_single = mu_steer * f_z_single_front * np.sqrt((tire_width**2 / 8) + kingpin_offset**2) if f_z_single_front > 0 else 0
-t_steer_design_single = t_steer_kingpin_single * safety_factor
-t_motor_steer_single = t_steer_design_single / (i_steer * eff_steer)
-rpm_motor_steer = rpm_kingpin * i_steer
-p_motor_steer_single = (t_motor_steer_single * rpm_motor_steer) / 9550
-
-# 汇总总功率 (W)
-total_p_drive = ((p_motor_front * 2) + (p_motor_rear * 2)) * 1000
-total_p_steer = (p_motor_steer_single * 2) * 1000
-
-# ================= 5. 右侧：总览 + 示意图 (大幅度缩小) + 细分区 (完全浮出) =================
-with main_right:
-    st.markdown("<h4 style='margin-top:0px; margin-bottom:4px; font-size:1.1rem; color:#334155;'>📊 仿真结果与动态图纸</h4>", unsafe_allow_html=True)
-    
-    # 5.1 总览
-    st.markdown(f"""
-        <div class="overview-container">
-            <div class="overview-card" style="border-left: 3px solid #1f77b4;">
-                <div class="overview-label">行走电机总功率</div>
-                <div class="overview-val">{total_p_drive:.1f} W</div>
-            </div>
-            <div class="overview-card" style="border-left: 3px solid #ff7f0e;">
-                <div class="overview-label">转向电机总功率</div>
-                <div class="overview-val">{total_p_steer:.1f} W</div>
-            </div>
-            <div class="overview-card" style="border-left: 3px solid #2ca02c;">
-                <div class="overview-label">动态轴荷比 (前 : 后)</div>
-                <div class="overview-val">{k_front*100:.1f}% : {k_rear*100:.1f}%</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # 5.2 示意图：彻底缩小 50% 物理大小 (画布调为超扁平 3.0 × 0.8，DPI微调)
-    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
+    # 5.1 紧凑图纸
+    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'SimHei', 'Microsoft YaHei']
     plt.rcParams['axes.unicode_minus'] = False
+    fig, ax = plt.subplots(figsize=(6.0, 1.15), dpi=120)
     
-    # 画布极度压缩：3.0英寸长，0.85英寸高 (极速扁平，杜绝纵向占地)
-    fig, ax = plt.subplots(figsize=(3.0, 0.85), dpi=130) 
+    ax.add_patch(plt.Circle((0, r1), r1, facecolor='#e1f5fe', edgecolor='#1f77b4', lw=1.5))
+    ax.add_patch(plt.Circle((wheelbase, r2), r2, facecolor='#e8f5e9', edgecolor='#2ca02c', lw=1.5))
+    ax.add_patch(plt.Circle((0, r1), 0.02, color='#334155'))
+    ax.add_patch(plt.Circle((wheelbase, r2), 0.02, color='#334155'))
     
-    # 实体车轮：线宽降至 1.0 (极致精简)
-    rear_wheel = plt.Circle((0, r_rear), r_rear, facecolor='#e1f5fe', edgecolor='#1f77b4', lw=1.0)
-    front_wheel = plt.Circle((wheelbase, r_front), r_front, facecolor='#e8f5e9', edgecolor='#2ca02c', lw=1.0)
-    ax.add_patch(rear_wheel)
-    ax.add_patch(front_wheel)
+    # 车架与浮船示意线
+    ax.plot([0, wheelbase], [r1, r2], color='#64748b', lw=3.0, solid_capstyle='round')
+    ax.plot([-0.2, wheelbase+0.2], [-0.02, -0.02], color='#94a3b8', lw=2.0, ls='-.') # 浮船线
     
-    # 微型轴心孔
-    ax.add_patch(plt.Circle((0, r_rear), 0.015, color='#334155'))
-    ax.add_patch(plt.Circle((wheelbase, r_front), 0.015, color='#334155'))
+    # 重心
+    ax.plot(cg_x, r1 + cg_height, marker='o', color='#ef4444', ms=6)
+    ax.plot([cg_x, cg_x], [r1 + cg_height, 0], color='#ef4444', ls=':', lw=0.8)
     
-    # 精简底盘车架 (线宽降至 2.2)
-    ax.plot([0, wheelbase], [r_rear, r_front], color='#64748b', lw=2.2, solid_capstyle='round')
+    ax.axhline(0, color='#1e293b', lw=1.2)
     
-    # 微型红重心 (ms 降至 5)
-    ax.plot(cg_x, r_rear + cg_height, marker='o', color='#ef4444', ms=5)
-    ax.plot([cg_x, cg_x], [r_rear + cg_height, 0], color='#ef4444', ls=':', lw=0.6)
-    
-    # 纤细地平线 (线宽降至 1.0)
-    ax.axhline(0, color='#334155', lw=1.0)
-    
-    # 精密微型标注卡片 (字号降至 5.8，内边距 pad 降至 0.18，绝不与地平线冲突)
-    ax.text(0, r_rear + 0.10, f"后轴: {int(dyn_load_rear)}N", color='#1f77b4', ha='center', fontsize=5.8, weight='bold',
-            bbox=dict(boxstyle="round,pad=0.18", fc="#f0f9ff", ec="#1f77b4", lw=0.5))
-    ax.text(wheelbase, r_front + 0.10, f"前轴: {int(dyn_load_front)}N", color='#2ca02c', ha='center', fontsize=5.8, weight='bold',
-            bbox=dict(boxstyle="round,pad=0.18", fc="#f0fdf4", ec="#2ca02c", lw=0.5))
+    # 标注轴荷
+    ax.text(0, r1 + 0.1, f"后轴荷 Qd1: {int(Qd1)}N", color='#1f77b4', ha='center', fontsize=7.5, weight='bold')
+    ax.text(wheelbase, r2 + 0.1, f"前轴荷 Qd2: {int(Qd2)}N", color='#2ca02c', ha='center', fontsize=7.5, weight='bold')
     
     ax.set_aspect('equal')
     ax.set_xlim(-0.4, wheelbase + 0.4)
-    ax.set_ylim(-0.15, max(r_rear, r_front) + cg_height + 0.18)
+    ax.set_ylim(-0.15, max(r1, r2) + cg_height + 0.15)
     ax.axis('off')
     plt.tight_layout()
     
-    # 🌟 关键：使用 columns 将缩小后的图纸在中央限制宽度陈列，阻止横向和纵向的强制拉伸
-    _, plot_center_col, _ = st.columns([1.5, 7.0, 1.5])
-    with plot_center_col:
-        st.pyplot(fig, use_container_width=False) # 彻底关闭容器拉伸，保全 50% 缩小的黄金比例！
+    _, plot_col, _ = st.columns([1, 8, 1])
+    with plot_col:
+        st.pyplot(fig, use_container_width=False)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # 5.3 细分区：高档工业表格 (由于上图缩减了一半高度，表格现已完美浮出，完全不被遮挡)
-    st.markdown("<h4 style='margin-top:2px; margin-bottom:1px; font-size:0.95rem; color:#334155;'>🔍 独立电机细分规格明细</h4>", unsafe_allow_html=True)
+    # 5.2 综合校核报告表
+    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">✅ 附着力校核与最优驱动匹配表</div>', unsafe_allow_html=True)
     
     table_html = f"""
     <table class="styled-table">
         <thead>
             <tr>
-                <th style="width: 32%;">电机位置与型号</th>
-                <th style="width: 20%;">工作用途</th>
-                <th style="width: 16%;">单台功率 (W)</th>
-                <th style="width: 16%;">单台扭矩 (N·m)</th>
-                <th style="width: 16%;">转速 (RPM)</th>
+                <th style="width: 15%;">车轴位置</th>
+                <th style="width: 17%;">设计目标推力 (N)</th>
+                <th style="width: 17%;">极限附着力 (N)</th>
+                <th style="width: 15%;">打滑校核状态</th>
+                <th style="width: 18%;">单电机功率要求</th>
+                <th style="width: 18%;">最优指令转速</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td style="color:#2ca02c; font-weight:600;">M1 (左前驱动) / M2 (右前驱动)</td>
-                <td>行走轮边驱动</td>
-                <td style="font-weight:600; color:#2ca02c;">{p_motor_front*1000:.1f} W</td>
-                <td>{t_motor_front:.1f} N·m</td>
+                <td style="color:#2ca02c; font-weight:600;">前轴 (含2电机)</td>
+                <td>{Pd2_req:.0f} N <span style="font-size:0.7rem; color:#64748b;">({ratio_front*100:.1f}%)</span></td>
+                <td>{P_max2:.0f} N</td>
+                <td><span class="{badge_f}">{slip_front_status}</span></td>
+                <td style="font-weight:600;">{P_kw_front*1000:.1f} W</td>
                 <td>{int(rpm_motor_front)} RPM</td>
             </tr>
             <tr>
-                <td style="color:#1f77b4; font-weight:600;">M3 (左后驱动) / M4 (右后驱动)</td>
-                <td>行走轮边驱动</td>
-                <td style="font-weight:600; color:#1f77b4;">{p_motor_rear*1000:.1f} W</td>
-                <td>{t_motor_rear:.1f} N·m</td>
+                <td style="color:#1f77b4; font-weight:600;">后轴 (含2电机)</td>
+                <td>{Pd1_req:.0f} N <span style="font-size:0.7rem; color:#64748b;">({ratio_rear*100:.1f}%)</span></td>
+                <td>{P_max1:.0f} N</td>
+                <td><span class="{badge_r}">{slip_rear_status}</span></td>
+                <td style="font-weight:600;">{P_kw_rear*1000:.1f} W</td>
                 <td>{int(rpm_motor_rear)} RPM</td>
-            </tr>
-            <tr>
-                <td style="color:#ff7f0e; font-weight:600;">左转向电机 / 右转向电机 (共2台)</td>
-                <td>独立线控转向</td>
-                <td style="font-weight:600; color:#ff7f0e;">{p_motor_steer_single*1000:.1f} W</td>
-                <td>{t_motor_steer_single:.2f} N·m</td>
-                <td>{int(rpm_motor_steer)} RPM</td>
             </tr>
         </tbody>
     </table>
     """
     st.markdown(table_html, unsafe_allow_html=True)
     
-    # 底部系统级参数 (最紧凑一格)
-    st.markdown("<div style='margin-top: 3px; font-size:0.78rem; color:#475569;'>📦 <b>整车克服总推力需求</b>: <code style='font-size:0.75rem;'>"+str(int(f_total))+" N</code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚀 <b>底盘设定仿真速度</b>: <code style='font-size:0.75rem;'>"+f"{v_target_ms:.2f} m/s"+"</code></div>", unsafe_allow_html=True)
+    # 底部工程提示
+    st.markdown(f"""
+    <div style='margin-top: 8px; font-size:0.8rem; color:#475569; background-color:#f1f5f9; padding:6px 10px; border-radius:6px;'>
+        <b>💡 设计师 / VCU电控师 指导意见：</b><br>
+        1. <b>总推力需求</b>：克服滚阻与浮船阻力共计 <code>{Pd_total:.0f} N</code>。全车总机械输出功率需满足 <code>{(P_kw_front*2 + P_kw_rear*2)*1000:.1f} W</code>。<br>
+        2. <b>防滑移与扭矩控制</b>：按照手册推导的最优附着比，VCU 应对后轮下发 <code>{ratio_rear*100:.1f}%</code> 的扭矩指令，前轮 <code>{ratio_front*100:.1f}%</code>。若前轮扭矩超限，将引发打滑。<br>
+        3. <b>电子差速超前率 (Slip-ratio Matching)</b>：电控目标速度闭环中，后轮外缘线速度建议比前轮高 3%~6%（参考手册P514），以消除寄生功率。
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
